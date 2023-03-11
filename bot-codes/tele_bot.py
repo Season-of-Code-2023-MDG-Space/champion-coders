@@ -5,20 +5,22 @@ from telegram.ext import (
     MessageHandler,
     Filters,
     CallbackQueryHandler,
+    CallbackContext,
     PollHandler,
 )
-
+from api import apiView
 from fetch import QuizQuestion
-import api
+
 import logging
 import logging.config
 import os
-import telegram
+from telegram import *
 import requests
 import json
 
 import time
 import datetime
+
 def main_handler(update, context):
     logging.info(f"update : {update}")
 
@@ -36,31 +38,37 @@ def help_command_handler(update, context):
 
 
 def poll_handler(update, context):
-    logging.info(f"question : {update.poll.question}")
-    logging.info(f"correct option : {update.poll.correct_option_id}")
-    logging.info(f"option #1 : {update.poll.options[0]}")
-    logging.info(f"option #2 : {update.poll.options[1]}")
-    logging.info(f"option #3 : {update.poll.options[2]}")
-
+    scorecard=0
     user_answer = get_answer(update)
+    
     logging.info(f"correct option {is_answer_correct(update)}")
+    # add_typing(update, context)
+    # add_text_message(update, context, f"Correct answer is {update.poll.options[update.poll.correct_option_id]['text']}")
 
-    add_typing(update, context)
-    add_text_message(update, context, f"Correct answer is {user_answer}")
-
+def answer_counter(update,context):
+    counter=0
+    if is_answer_correct(update)==True:
+        counter=counter+1
+    return counter
 
 def start_command_handler(update, context):
-    update.message.reply_text("Please enter the number of questions you want to answer")
+    update.message.reply_text("Please enter the number of questions you want to answer(1-10) in the format /quiz<space>number of questions")
+    
 
     
-    # b=int(input())
-    # for i in range (0,b):
-   
-    dict=QuizQuestion.questions()
-    add_typing(update, context)
-            
+def quiz_command_handler(update,context):
+    try:
+        Number_of_questions=int(context.args[0])
+        for i in range (0,Number_of_questions):
+            dict=apiView.apiCall()
+            add_typing(update, context)
+            add_quiz_question(update,context,dict)
+            add_typing(update, context)
+            time.sleep(0.5)
+    except:
+        add_text_message(update, context, f"Please provide the correct format")
 
-    add_quiz_question(update,context,dict)
+
 
 
 
@@ -68,8 +76,8 @@ def add_quiz_question(update, context ,dict):
     
     message = context.bot.send_poll(
         chat_id=get_chat_id(update, context),
-        question=dict[0],
-        options=dict[4],
+        question=dict[2],
+        options=dict[1],
         type=Poll.QUIZ,
         correct_option_id=dict[3],
         open_period=8,
@@ -87,11 +95,9 @@ def add_typing(update, context):
         action=ChatAction.TYPING,
         timeout=1,
     )
-    time.sleep(1)
+    time.sleep(0.7)
 
-def no_of_questions(user_input):
-    s=user_input
-    return s
+
 
 
 def add_text_message(update, context, message):
@@ -153,9 +159,10 @@ def main():
     updater = Updater(DefaultConfig.TELEGRAM_TOKEN,
                   use_context=True)
     dispatcher = updater.dispatcher
-    print('Welcome,Please use /start command to start me')
+   
     dispatcher.add_handler(CommandHandler("help", help_command_handler))
     dispatcher.add_handler(CommandHandler("start", start_command_handler))
+    dispatcher.add_handler(CommandHandler("quiz",quiz_command_handler))
 
     # message handler
     dispatcher.add_handler(MessageHandler(Filters.text, main_handler))
@@ -175,6 +182,14 @@ def main():
 
    
     
+    # updater.start_webhook(
+    #     listen="0.0.0.0",
+    #     port=int(DefaultConfig.PORT),
+    #     url_path=DefaultConfig.TELEGRAM_TOKEN,
+    #     webhook_url=DefaultConfig.WEBHOOK_URL+DefaultConfig.TELEGRAM_TOKEN
+    # )
+
+    # logging.info(f"Start webhook mode on port {DefaultConfig.PORT}")
     updater.start_polling()
     logging.info(f"Start polling mode")
 
@@ -183,10 +198,10 @@ def main():
 
 
 class DefaultConfig:
-    PORT = int(os.environ.get("PORT", 3978))
-    TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "6049110046:AAGDMulUlNMrL-DCf2Qy2LLorYDCA6DQ4zQ")
+    PORT = int(os.environ.get("PORT", 8443))
+    TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "6049110046:AAHX0wlv39PRwEJRSIXAfZVIWDDoJwxwlZw")
     MODE = os.environ.get("MODE", "polling")
-    WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
+    WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "https://webhook.site/c09aeb51-af69-446b-93c7-a6d96c5d52d4")
 
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
