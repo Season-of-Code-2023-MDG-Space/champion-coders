@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 
 from fetch import QuizQuestion
-
+import api
 import logging
 import logging.config
 import os
