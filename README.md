@@ -1,3 +1,8 @@
 # champion-coders
 
-It is a place to give everyone an idea about what your code does and for demos :)
+                                                                    BetaBot
+                                                                    
+                                                                    
+•	BetaBot provides you the facility to take quizzes for various general knowledge interviews ,exams ,etc..
+•	It is a python based telegram bot which can provide you questions according to your wish and also you can compete with your friends.
+
