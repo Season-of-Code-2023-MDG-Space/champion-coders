@@ -1,4 +1,3 @@
-from telegram import Poll,ChatAction
 from telegram.ext import (
     Updater,
     CommandHandler,
@@ -7,9 +6,10 @@ from telegram.ext import (
     CallbackQueryHandler,
     CallbackContext,
     PollHandler,
+    PollAnswerHandler
 )
 from api import apiView
-from fetch import QuizQuestion
+from telegram import Poll 
 
 import logging
 import logging.config
@@ -20,10 +20,16 @@ import json
 
 import time
 import datetime
+user_scores={}
+user_name=""
+
 
 def main_handler(update, context):
     logging.info(f"update : {update}")
-
+    if update.message.chat.username is not None:
+        user_name=update.message.chat.username
+        if user_name not in user_scores:
+            user_scores[user_name] = 0
     if update.message is not None:
         user_input = get_text_from_message(update)
         logging.info(f"user_input : {user_input}")
@@ -36,38 +42,64 @@ def main_handler(update, context):
 def help_command_handler(update, context):
     update.message.reply_text("Type /start")
 
-
-def poll_handler(update, context):
-    scorecard=0
-    user_answer = get_answer(update)
-    
-    logging.info(f"correct option {is_answer_correct(update)}")
-    # add_typing(update, context)
-    # add_text_message(update, context, f"Correct answer is {update.poll.options[update.poll.correct_option_id]['text']}")
-
-def answer_counter(update,context):
-    counter=0
-    if is_answer_correct(update)==True:
-        counter=counter+1
-    return counter
-
 def start_command_handler(update, context):
     update.message.reply_text("Please enter the number of questions you want to answer(1-10) in the format /quiz<space>number of questions")
     
-
+    # for i in range(0,4):
+    #     dict=apiView.apiCall()
+    #     add_typing(update, context)
+    #     add_quiz_question(update,context,dict)  
+    #     time.sleep(0.5)
     
 def quiz_command_handler(update,context):
-    try:
+    # try:
         Number_of_questions=int(context.args[0])
         for i in range (0,Number_of_questions):
             dict=apiView.apiCall()
             add_typing(update, context)
             add_quiz_question(update,context,dict)
-            add_typing(update, context)
-            time.sleep(0.5)
-    except:
-        add_text_message(update, context, f"Please provide the correct format")
+            if i!=Number_of_questions-1:
+                add_typing(update, context)
+                time.sleep(0.5)
+            if i==Number_of_questions-1:
+                time.sleep(8)
+                display_scores(update,context)
+            # logging.info(user_scores)
+        # display_scores(update,context)
+    # except:
+    #     add_text_message(update, context, f"Please provide the correct format")
 
+
+
+def poll_answer_handler(update,context):
+    logging.info('inside answer handler')
+    correct_answer_id=update.poll.correct_option_id
+    answer=update.poll.options[correct_answer_id].text
+    user_answer = get_answer(update)
+    
+    # logging.info(user_info)
+    # logging.info(answer)
+    logging.info(user_name)
+
+    
+    # Calculate the user's score based on the selected option
+    if answer==user_answer:
+        user_scores[user_name] += 1
+    
+    # Add the user's score to the user_scores dictionary
+  
+    
+    # logging.info(user_scores)
+    # logging.info(update.poll_answer.option_ids)
+
+
+
+# Define a function to display the scores
+def display_scores(update,context):
+    
+    for user_id, score in user_scores.items(): 
+        add_text_message(update,context, f"Quiz scores\n{user_id}:{score}\n")
+    user_scores.clear()
 
 
 
@@ -81,12 +113,11 @@ def add_quiz_question(update, context ,dict):
         type=Poll.QUIZ,
         correct_option_id=dict[3],
         open_period=8,
-        is_anonymous=True,
-        
+        is_anonymous=True, 
     )
 
     # Save some info about the poll the bot_data for later use in receive_quiz_answer
-    context.bot_data.update({message.poll.id: message.chat.id})
+    # context.bot_data.update({message.poll.id: message.chat.id})
 
 
 def add_typing(update, context):
@@ -120,7 +151,7 @@ def get_answer(update):
     return ret
 
 
-def is_answer_correct(update):
+def is_answer_correct(update,score):
     answers = update.poll.options
 
     ret = False
@@ -131,8 +162,9 @@ def is_answer_correct(update):
             ret = True
             break
         counter = counter + 1
-
     return ret
+
+    
 
 
 # extract chat_id based on the incoming object
@@ -147,6 +179,24 @@ def get_chat_id(update, context):
     chat_id = context.bot_data[update.poll.id]
 
   return chat_id
+# Initialize the dictionary to store user scores
+user_scores = {}
+
+# Define a function to update the user score
+def update_score(user_id, score):
+    if user_id not in user_scores:
+        user_scores[user_id] = score
+    else:
+        user_scores[user_id] += score
+
+
+
+# Define a function to handle poll answers
+# def handle_poll_answer(bot, update):
+#     user_id = update.poll_answer.user.id
+#     option_ids = update.poll_answer.option_ids
+#     score = len(option_ids) # Each selected option is worth 1 point
+#     update_score(user_id, score)
 
 
 def error(update, context):
@@ -154,6 +204,8 @@ def error(update, context):
     logging.warning('Update "%s" ', update)
     logging.exception(context.error)
 
+def dummy(update, context):
+    logging.info('Dummy func')
 
 def main():
     updater = Updater(DefaultConfig.TELEGRAM_TOKEN,
@@ -165,7 +217,7 @@ def main():
     dispatcher.add_handler(CommandHandler("quiz",quiz_command_handler))
 
     # message handler
-    dispatcher.add_handler(MessageHandler(Filters.text, main_handler))
+    dispatcher.add_handler(MessageHandler(Filters.text, main_handler,pass_chat_data=True,pass_user_data=True))
 
 
 
@@ -175,7 +227,11 @@ def main():
     )
 
     # quiz answer handler
-    dispatcher.add_handler(PollHandler(poll_handler, pass_chat_data=True, pass_user_data=True))
+    #dispatcher.add_handler(PollAnswerHandler(dummy, pass_chat_data=True, pass_user_data=True))
+    dispatcher.add_handler(PollHandler(poll_answer_handler, pass_chat_data=True, pass_user_data=True))
+    
+
+
 
     # log all errors
     dispatcher.add_error_handler(error)
@@ -213,7 +269,7 @@ class DefaultConfig:
         )
 
 
-if __name__ == "__main__":
+if __name__== "__main__":
 
     # Enable logging
     DefaultConfig.init_logging()
